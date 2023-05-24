@@ -4,41 +4,43 @@ namespace App\Http\Controllers;
 
 use App\Models\Attendance;
 use App\Models\Employes;
+use App\Services\Messages;
 use Carbon\Carbon;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class TelegramBotController extends Controller
 {
-    private $commands = ['/in', '/out','/break','/back'];
+    private array $commands = ['/in', '/out','/break','/back','/register'];
+    private Messages $messages;
+
+    public function __construct(Messages $messages)
+    {
+        $this->messages = $messages;
+    }
+
     public function webhook(Request $request): void
     {
         $update = json_decode($request->getContent(), true);
         if (isset($update['message']['text'])) {
-            Log::info($update);
             $employe = Employes::search($update['message']['from']['id']);
-            if ($employe and (in_array($update['message']['text'], $this->commands))){
+            if(!$employe and $update['message']['text'] == '/register'){
+                $this->Register($update);
+            }else if ($employe and (in_array($update['message']['text'], $this->commands))){
                 $this->proceedCommand($employe, $update);
-            } else if(!$employe) {
-                $this->addEmploye($update);
+            } else if(!$employe and (in_array($update['message']['text'], $this->commands))){
+                $this->messages->send( 'Try /register first');
             }else{
-                $this->sendMessage($employe->tlg_id, 'unknown command');
+                $this->messages->send('Unknown command');
             }
         }else{
-            Log::debug($update);
+            Log::debug('data update not valid ' . $update);
         }
-
     }
 
-    private function sendMessage($tlg_id, string $string): void
+    private function Register($update): void
     {
-        $string = urlencode($string);
-        file_get_contents('https://api.telegram.org/bot' . env('TELEGRAM_BOT_TOKEN') . '/sendMessage?chat_id=' . $tlg_id . '&text=' . $string);
-    }
-
-    private function addEmploye(mixed $update): void
-    {
-        Log::debug('enter addEmploye');
         $employe = new Employes();
         $employe->tlg_id = $update['message']['from']['id'];
         $employe->name = $update['message']['from']['first_name'];
@@ -47,9 +49,9 @@ class TelegramBotController extends Controller
         }else{
             $employe->username = $update['message']['from']['first_name'];
         }
-        $message = 'Hello ' . $employe->username;
+        $message = urlencode('Welcome ' . $employe->username);
         if ($employe->save()){
-            $this->sendMessage($employe->tlg_id, $message);
+            $this->messages->send($message);
         }
     }
 
@@ -68,11 +70,10 @@ class TelegramBotController extends Controller
         $attendance = new Attendance();
         $attendance->tlg_id = $employe->tlg_id;
         $attendance->check_in = $date;
-        $message = 'Hello ' . $employe->username ;
-        Log::debug('enter In');
+        $message = urlencode('Hello ' . $employe->username );
         try {
             $attendance->save();
-            $this->sendMessage($update['message']['chat']['id'], $message);
+            $this->messages->send($message);
         }catch (\Exception $e){
             Log::channel('attendance')->error($e->getMessage());
             Log::channel('attendance')->error($employe->tlg_id.' err check_in in date: '.$date);
@@ -93,13 +94,13 @@ class TelegramBotController extends Controller
             $attendance->check_out = $date;
             try {
                 $attendance->save();
-                $this->sendMessage($update['message']['chat']['id'], $message);
+                $this->messages->send($message);
             }catch (\Exception $e){
                 Log::channel('attendance')->error($e->getMessage());
                 Log::channel('attendance')->error($employe->tlg_id.' err check_out in date: '.$date);
             }
         }else{
-            $this->sendMessage($update['message']['chat']['id'], 'try /in before /out');
+            $this->messages->send('Try /in before /out');
         }
     }
 
@@ -116,13 +117,13 @@ class TelegramBotController extends Controller
             $attendance->break_in = $date;
             try {
                 $attendance->save();
-                $this->sendMessage($update['message']['chat']['id'], 'break');
+                $this->messages->send('Break');
             }catch (\Exception $e){
                 Log::channel('attendance')->error($e->getMessage());
                 Log::channel('attendance')->error($employe->tlg_id.' err break in date: '.$date);
             }
         }else{
-            $this->sendMessage($update['message']['chat']['id'], 'try /in before /break');
+            $this->messages->send('Try /in before /break');
         }
     }
 
@@ -140,13 +141,13 @@ class TelegramBotController extends Controller
             $attendance->break_out = $date;
             try {
                 $attendance->save();
-                $this->sendMessage($update['message']['chat']['id'], 'back');
+                $this->messages->send('Back');
             }catch (\Exception $e){
                 Log::channel('attendance')->error($e->getMessage());
                 Log::channel('attendance')->error($employe->tlg_id.' err back in date: '.$date);
             }
         }else{
-            $this->sendMessage($update['message']['chat']['id'], 'try /break before /back');
+            $this->messages->send('Try /break before /back');
         }
     }
 
