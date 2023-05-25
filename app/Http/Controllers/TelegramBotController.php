@@ -3,7 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
-use App\Models\Employes;
+use App\Models\Employees;
+use App\Repositories\EmployesRepository;
 use App\Services\Messages;
 use Carbon\Carbon;
 use GuzzleHttp\Exception\GuzzleException;
@@ -14,53 +15,34 @@ class TelegramBotController extends Controller
 {
     private array $commands = ['/in', '/out','/break','/back','/register'];
     private Messages $messages;
-
-    public function __construct(Messages $messages)
+    public array $update;
+    Private EmployesRepository $employeesRepository;
+    public function __construct(Messages $messages, Request $request, Employees $employe, EmployesRepository $employeesRepository)
     {
         $this->messages = $messages;
+        $this->update = json_decode($request->getContent(), true);
+        $this->employeesRepository = $employeesRepository;
     }
-
-    public function webhook(Request $request): void
+    public function webhook(): void
     {
-        $update = json_decode($request->getContent(), true);
-        if (isset($update['message']['text'])) {
-            $employe = Employes::search($update['message']['from']['id']);
-            if(!$employe and $update['message']['text'] == '/register'){
-                $this->Register($update);
-            }else if ($employe and (in_array($update['message']['text'], $this->commands))){
-                $this->proceedCommand($employe, $update);
-            } else if(!$employe and (in_array($update['message']['text'], $this->commands))){
-                $this->messages->send( 'Try /register first');
-            }else{
-                $this->messages->send('Unknown command');
-            }
-        }else{
-            Log::debug('data update not valid ' . $update);
-        }
+        $this->proceedCommand();
     }
-
-    private function Register($update): void
+    private function Register(): void
     {
-        $employe = new Employes();
-        $employe->tlg_id = $update['message']['from']['id'];
-        $employe->name = $update['message']['from']['first_name'];
-        if (isset($update['message']['from']['username'])){
-            $employe->username = $update['message']['from']['username'];
-        }else{
-            $employe->username = $update['message']['from']['first_name'];
-        }
-        $message = urlencode('Welcome ' . $employe->username);
-        if ($employe->save()){
-            $this->messages->send($message);
-        }
+        $this->employeesRepository->register();
     }
-
     /**
      * check in attendance
      */
-    private function In($employe,$update): void
+    private function In(): void
     {
-        $date = Carbon::createFromTimestamp($update['message']['date'],'America/New_York');
+        $this->employeesRepository->in();
+        $employe = Employees::search($this->update['message']['from']['id']);
+        if (!$employe) {
+            $this->messages->send('Try /register first');
+            return;
+        }
+        $date = Carbon::createFromTimestamp($this->update['message']['date'],'America/New_York');
         $attendance = Attendance::where('tlg_id', $employe->tlg_id)
             ->where('check_out', null)->first();
         if ($attendance){
@@ -79,14 +61,13 @@ class TelegramBotController extends Controller
             Log::channel('attendance')->error($employe->tlg_id.' err check_in in date: '.$date);
         }
     }
-
     /**
      * check out attendance
      */
-    private function Out($employe,$update): void
+    private function Out(): void
     {
-
-        $date = Carbon::createFromTimestamp($update['message']['date'],'America/New_York');
+        $date = Carbon::createFromTimestamp($this->update['message']['date'],'America/New_York');
+        $employe = Employees::search($this->update['message']['from']['id']);
         $attendance = Attendance::where('tlg_id', $employe->tlg_id)
             ->where('check_out', null)->first();
         $message = 'See you later ' . $employe->username ;
@@ -103,13 +84,13 @@ class TelegramBotController extends Controller
             $this->messages->send('Try /in before /out');
         }
     }
-
     /**
      * break attendance
      */
-    private function Break($employe,$update): void
+    private function Break(): void
     {
-        $date = Carbon::createFromTimestamp($update['message']['date'],'America/New_York');
+        $date = Carbon::createFromTimestamp($this->update['message']['date'],'America/New_York');
+        $employe = Employees::search($this->update['message']['from']['id']);
         $attendance = Attendance::where('tlg_id', $employe->tlg_id)
             ->where('check_out', null)
             ->where('break_in',null)->first();
@@ -130,9 +111,10 @@ class TelegramBotController extends Controller
     /**
      * back attendance
      */
-    private function Back($employe,$update): void
+    private function Back(): void
     {
-        $date = Carbon::createFromTimestamp($update['message']['date'],'America/New_York');
+        $date = Carbon::createFromTimestamp($this->update['message']['date'],'America/New_York');
+        $employe = Employees::search($this->update['message']['from']['id']);
         $attendance = Attendance::where('tlg_id', $employe->tlg_id)
             ->where('check_out', null)
             ->where('break_in','!=',null)
@@ -151,9 +133,13 @@ class TelegramBotController extends Controller
         }
     }
 
-    private function proceedCommand($employe, mixed $update): void
+    private function proceedCommand(): void
     {
-        $command = substr($update['message']['text'],1);
-        $this->$command($employe,$update);
+        $command = substr($this->update['message']['text'],1);
+        if(in_array('/'.$command, $this->commands)){
+            $this->$command();
+        }else{
+            $this->messages->send('Unknown command');
+        }
     }
 }
