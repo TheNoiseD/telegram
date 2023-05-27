@@ -9,7 +9,7 @@ class Employees extends Model
 {
     use HasFactory;
 
-    public static function search(mixed $id)
+    static public function getEmploye(mixed $id)
     {
         return self::where('tlg_id', $id)->first();
     }
