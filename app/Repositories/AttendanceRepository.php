@@ -5,9 +5,11 @@ namespace App\Repositories;
 use App\Interfaces\BaseRepository;
 use App\Models\Attendance;
 use App\Models\Employees;
+use App\Models\Schedules;
 use App\Services\Messages;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AttendanceRepository implements BaseRepository
@@ -85,6 +87,19 @@ class AttendanceRepository implements BaseRepository
                             return;
                         }
                         $this->create();
+
+                        //TODO: check if late migrate code
+                        $dayOfWeek = $this->date->dayOfWeek;
+                        $schedule = Schedules::getSchedule($this->employe, $dayOfWeek);
+                        if ($this->date->format('H:i:s', 'America/New_York') > $schedule->start){
+                            $this->messages->send('You are late');
+                            //TODO: register late in absence time
+
+                        }
+
+
+                        Log::channel('attendance')->info('schedule ' . $schedule->start);
+
                         $this->messages->send('Check in at ' . $this->date->format('H:i:s', 'America/New_York'));
                     }
                     break;
@@ -124,6 +139,16 @@ class AttendanceRepository implements BaseRepository
                             $this->messages->send('You are already checked out');
                         }else{
                             $this->create();
+
+                            // TODO: check if early migrate code
+                            $dayOfWeek = $this->date->dayOfWeek;
+                            $schedule = Schedules::getSchedule($this->employe, $dayOfWeek);
+                            if ($this->date->format('H:i:s', 'America/New_York') < $schedule->end){
+                                $this->messages->send('You are leaving early');
+                                //TODO: register early in absence time
+
+                            }
+
                             $this->messages->send('Check out at ' . $this->date->format('H:i:s', 'America/New_York'));
                         }
                     }

@@ -34,20 +34,22 @@ class TelegramBotController extends Controller
     {
         $this->employeesRepository->register();
     }
+    private function attendanceProcess(): void
+    {
+        $this->attendanceRepository->register();
+    }
+
     private function proceedCommand(): void
     {
         if (isset($this->update['message']['text'])) {
             $command = substr($this->update['message']['text'],1);
-            if(in_array('/'.$command, $this->commands)){
+            if($command == 'register'){
+                $this->Register();
+            }else if(in_array('/'.$command, $this->commands) && $command != 'register'){
                 $this->attendanceProcess();
             }else{
                 $this->messages->send('Unknown command');
             }
         }
-    }
-
-    private function attendanceProcess(): void
-    {
-        $this->attendanceRepository->register();
     }
 }
