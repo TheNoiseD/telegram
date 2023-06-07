@@ -3,13 +3,13 @@
 namespace App\Repositories;
 
 use App\Interfaces\BaseRepository;
+use App\Models\AbsencesTime;
 use App\Models\Attendance;
 use App\Models\Employees;
 use App\Models\Schedules;
 use App\Services\Messages;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AttendanceRepository implements BaseRepository
@@ -20,16 +20,19 @@ class AttendanceRepository implements BaseRepository
     protected Employees $employe;
     protected Messages $messages;
     protected Attendance $attendance;
+    protected AbsencesTime $absencesTime;
     protected string $command;
+    protected mixed $param;
+    protected string $timeCheckIn;
 
-    public function __construct(Request $request, Employees $employe, Messages $messages, Carbon $carbon, Attendance $attendance)
+    public function __construct(Request $request, Employees $employe, Messages $messages, Carbon $carbon, Attendance $attendance,AbsencesTime $absencesTime)
     {
         $this->date = $carbon->createFromTimestamp($request['message']['date'],'America/New_York');
         $this->request = $request;
         $this->employe = $employe;
         $this->messages = $messages;
         $this->attendance = $attendance;
-        $this->command = substr($this->request['message']['text'], 1);
+        $this->absencesTime = $absencesTime;
     }
 
     public function search():void
@@ -70,15 +73,27 @@ class AttendanceRepository implements BaseRepository
         }
     }
 
-    public function register():void
+    public function register($command,$param):void
     {
+        $this->command = $command;
+//        separar param en letras
+        $arrParam = str_split($param);
+//        eliminar ( )
+        $arrParam = array_filter($arrParam, function ($value) {
+            return $value != '(' && $value != ')';
+        });
+        $this->param = implode('',$arrParam);
+
         $this->search();
         if(empty($this->employe->id)){
             $this->messages->send('Try /register first');
         }else{
             switch ($this->command){
                 default:
+                    $this->messages->send('Invalid command');
+                    break;
                 case 'in':
+
                     if (!empty($this->attendance->id)){
                         $this->messages->send('You are already checked in');
                     }else{
@@ -87,22 +102,20 @@ class AttendanceRepository implements BaseRepository
                             return;
                         }
                         $this->create();
-
-                        //TODO: check if late migrate code
-                        $dayOfWeek = $this->date->dayOfWeek;
-                        $schedule = Schedules::getSchedule($this->employe, $dayOfWeek);
+                        $schedule = Schedules::getSchedule($this->employe, $this->date->dayOfWeek);
                         if ($this->date->format('H:i:s', 'America/New_York') > $schedule->start){
+                            $diff = $this->date->diff($schedule->start)->format('%H:%I:%S');
+                            try {
+                                $this->absencesTime->create($this->employe,$diff,'late',$this->date);
+                            }catch (\Exception $e){
+                                Log::channel('attendance')->error('error create ' . $e->getMessage());
+                            }
                             $this->messages->send('You are late');
-                            //TODO: register late in absence time
-
                         }
-
-
-                        Log::channel('attendance')->info('schedule ' . $schedule->start);
 
                         $this->messages->send('Check in at ' . $this->date->format('H:i:s', 'America/New_York'));
                     }
-                    break;
+                break;
                 case 'break':
                     if (empty($this->attendance->check_in)){
                         $this->messages->send('You are not checked in');
@@ -114,7 +127,7 @@ class AttendanceRepository implements BaseRepository
                             $this->messages->send('Break at ' . $this->date->format('H:i:s', 'America/New_York'));
                         }
                     }
-                    break;
+                break;
                 case 'back':
                     if (empty($this->attendance->check_in)){
                         $this->messages->send('You are not checked in');
@@ -130,7 +143,7 @@ class AttendanceRepository implements BaseRepository
                             }
                         }
                     }
-                    break;
+                break;
                 case 'out':
                     if (empty($this->attendance->check_in)){
                         $this->messages->send('You are not checked in');
@@ -139,21 +152,20 @@ class AttendanceRepository implements BaseRepository
                             $this->messages->send('You are already checked out');
                         }else{
                             $this->create();
-
-                            // TODO: check if early migrate code
-                            $dayOfWeek = $this->date->dayOfWeek;
-                            $schedule = Schedules::getSchedule($this->employe, $dayOfWeek);
+                            $schedule = Schedules::getSchedule($this->employe, $this->date->dayOfWeek);
                             if ($this->date->format('H:i:s', 'America/New_York') < $schedule->end){
+                                $diff = $this->date->diff($schedule->end)->format('%H:%I:%S');
+                                try {
+                                    $this->absencesTime->create($this->employe,$diff,'early',$this->date);
+                                }catch (\Exception $e){
+                                    Log::channel('attendance')->error('error create ' . $e->getMessage());
+                                }
                                 $this->messages->send('You are leaving early');
-                                //TODO: register early in absence time
-
                             }
-
                             $this->messages->send('Check out at ' . $this->date->format('H:i:s', 'America/New_York'));
                         }
                     }
-                    break;
-
+                break;
             }
         }
     }

@@ -60,7 +60,14 @@ return [
             'driver' => 'single',
             'path' => storage_path('logs/attendance.log'),
         ],
-
+        'absences' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/absences.log'),
+        ],
+        'test' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/test.log'),
+        ],
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),

@@ -43,7 +43,7 @@ class EmployeesRepository implements BaseRepository
         }
     }
 
-    public function register(): void
+    public function register($command,$param): void
     {
         $this->search();
         if(empty($this->employe->id)){

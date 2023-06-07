@@ -7,5 +7,5 @@ interface BaseRepository
 
     public function create():void;
 
-    public function register():void;
+    public function register($command,$param):void;
 }
