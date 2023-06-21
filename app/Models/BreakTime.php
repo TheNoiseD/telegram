@@ -5,13 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class JustifyAbsences extends Model
+class BreakTime extends Model
 {
     use HasFactory;
 
-    public function getAbsenceToDay(Employees $tlg_id)
+    static public function getBreak(mixed $tlg_id)
     {
-        return self::where('tlg_id', $tlg_id->tlg_id)->whereDate('date', now()->format('Y-m-d'))->first();
+        return self::where('tlg_id',$tlg_id)->whereDate('break_in',now('America/New_York'))->where('break_out',null)->first();
     }
 
     public function employee()

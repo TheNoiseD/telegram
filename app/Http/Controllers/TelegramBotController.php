@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 
 class TelegramBotController extends Controller
 {
-    protected array $DefCommands = ['in', 'out','break','back','register','absence'];
+    protected array $DefCommands = ['in', 'out','lunch','back','register','absence','break'];
     protected string $command;
     protected Messages $messages;
     public array $update;
@@ -70,6 +70,7 @@ class TelegramBotController extends Controller
             $this->params = null;
         }
 
+
         if (isset($this->update['message']['text'])) {
             if (isset($this->update['message']['entities']) && $this->update['message']['entities'][0]['type'] != 'mention'){
                 if (str_contains($this->update['message']['text'], '@')){
@@ -79,10 +80,14 @@ class TelegramBotController extends Controller
                 }
             }else if(in_array($this->update['message']['text'], $this->DefCommands)){
                 $this->command = $this->update['message']['text'];
+
             }else if (count($arrWords) > 1 && in_array($arrWords[0], $this->DefCommands)){
                 $this->command = $arrWords[0];
                 $this->params = implode(' ', array_slice($arrWords, 1));
+            }else{
+                $this->command = $arrWords[0];
             }
         }
+
     }
 }

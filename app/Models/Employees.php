@@ -19,4 +19,38 @@ class Employees extends Model
     {
         return self::where('username', 'like', '%' . $substr . '%')->first();
     }
+
+    public function attendance()
+    {
+        return $this->hasMany(Attendance::class,'tlg_id','tlg_id');
+    }
+    public function breakTime()
+    {
+        return $this->hasMany(BreakTime::class,'tlg_id','tlg_id');
+    }
+    public function absencesTime()
+    {
+        return $this->hasMany(AbsencesTime::class,'employe_id','tlg_id');
+    }
+
+    public function justifyAbsences()
+    {
+        return $this->hasMany(JustifyAbsences::class,'tlg_id','tlg_id');
+    }
+
+    public function salary()
+    {
+        return $this->hasOne(Salary::class,'employe_id','id');
+    }
+
+    public function role()
+    {
+        return $this->belongsTo(Role::class,'role','id');
+    }
+
+    public function absence()
+    {
+        return $this->hasMany(Absences::class,'tlg_id','tlg_id');
+    }
+
 }

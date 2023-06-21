@@ -18,4 +18,9 @@ class AbsencesTime extends Model
         $this->date = $date;
         $this->save();
     }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employees::class,'employee_id','id');
+    }
 }

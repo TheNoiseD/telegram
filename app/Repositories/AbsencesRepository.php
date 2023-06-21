@@ -34,7 +34,6 @@ class AbsencesRepository implements BaseRepository
     public function search(): void
     {
         $employe = $this->employe->getEmployeByUser(substr($this->params[0], 1));
-        Log::channel('test')->info($employe);
         if ($employe)
             $this->employe = $employe;
         $absence = $this->justifyAbsences->getAbsenceToDay($this->employe);

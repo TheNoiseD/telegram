@@ -24,4 +24,9 @@ class Attendance extends Model
     {
         return self::where('check_out','!=', null)->whereDate('check_in', Carbon::now()->add('-1 day')->format('Y-m-d'))->get();
     }
+
+    public function employee()
+    {
+        return $this->belongsTo(Employees::class,'tlg_id','tlg_id');
+    }
 }
