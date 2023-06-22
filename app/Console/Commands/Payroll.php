@@ -56,6 +56,21 @@ class Payroll extends Command
                 $hourlyCost = round(($payCut / $daysWorked) / 8, 2);
                 $workedHoursR = '1-1-1 00:00:00';
                 $absencesHoursR = '1-1-1 00:00:00';
+                $breaks = $employee->breakTime->whereBetween('break_in', [$startPayroll, $endPayroll]);
+                if($employee->roles->eSchedule->first()->special_schedule == 1){
+                    $breaksAbsences = '00:00:00';
+                   foreach ($breaks as $break){
+                       $breakTime = Carbon::parse($break->time_break);
+                       $breaksAbsences = Carbon::parse($breaksAbsences)->addHours($breakTime->format('H'))->addMinutes($breakTime->format('i'))->addSeconds($breakTime->format('s'));
+                   }
+                }else{
+                    $breaksAbsences = '00:00:00';
+                    foreach ($breaks as $break){
+                        $breakTime = Carbon::parse($break->break_fault);
+                        $breaksAbsences = Carbon::parse($breaksAbsences)->addHours($breakTime->format('H'))->addMinutes($breakTime->format('i'))->addSeconds($breakTime->format('s'));
+                    }
+                }
+
                 foreach ($attendances as $attendance) {
                     $checkIn = Carbon::parse($attendance->check_in);
                     $checkOut = Carbon::parse($attendance->check_out);
@@ -74,6 +89,7 @@ class Payroll extends Command
 
                     $workedHoursR = Carbon::parse($workedHoursR)->addHours($workedHours->h)->addMinutes($workedHours->i)->addSeconds($workedHours->s);
                 }
+                $workedHoursR = $workedHoursR->addHours($breaksAbsences->format('H'))->addMinutes($breaksAbsences->format('i'))->addSeconds($breaksAbsences->format('s'));
                 $workedHoursR = $workedHoursR->diff(Carbon::parse('1-1-1 00:00:00'));
                 $wh = round(($workedHoursR->d * 24) + $workedHoursR->h + ($workedHoursR->i / 60), 2);
 
